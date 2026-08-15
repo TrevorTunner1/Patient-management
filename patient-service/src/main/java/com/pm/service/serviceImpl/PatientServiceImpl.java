@@ -1,23 +1,74 @@
 package com.pm.service.serviceImpl;
 
+import com.pm.exception.EmailAlreadyExistException;
+import com.pm.exception.PatientNotExistException;
+import com.pm.mapper.PatientMapper;
 import com.pm.modal.Patient;
 import com.pm.payloads.response.PatientResponseDto;
+import com.pm.payloads.response.request.PatientRequestDto;
 import com.pm.repository.PatientRepository;
 import com.pm.service.PatientService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class PatientServiceImpl implements PatientService {
     private final PatientRepository patientRepository;
+    private final PatientMapper patientMapper;
 
     public List<PatientResponseDto> getAllPatient () {
-
-         return   null;
-
+        List<Patient> patientList = patientRepository.findAll();
+        return patientList.stream().map(patientMapper::toResponse).toList();
     }
+
+    @Override
+    public PatientResponseDto createPatient(PatientRequestDto patientRequestDto) {
+
+        if (patientRepository.existsByEmail(patientRequestDto.email())){
+             throw new EmailAlreadyExistException("A patient with this email is already created "
+                    + patientRequestDto.email());
+        }
+
+
+       Patient patient =  patientMapper.toEntity(patientRequestDto);
+
+
+        return patientMapper.toResponse(patientRepository.save(patient));
+    }
+
+    @Override
+    public PatientResponseDto updatePatient(UUID id, PatientRequestDto patientRequestDto) {
+       Patient patient =  patientRepository.findById(id)
+                .orElseThrow(()-> new PatientNotExistException("patient does not exist"));
+
+        if (patientRepository.existsByEmail(patientRequestDto.email())){
+            throw new EmailAlreadyExistException("A patient with this email is already created "
+                    + patientRequestDto.email());
+        }
+
+        return patientMapper.toResponse(patientRepository.save(patientMapper.toEntity(patientRequestDto)));
+    }
+
+    @Override
+    public PatientResponseDto partialUpdate(UUID id, PatientRequestDto patientRequestDto) {
+
+        return patientRepository.findById(id).map(existingPat -> {
+            Optional.ofNullable(patientRequestDto.address()).ifPresent(existingPat::setAddress);
+            Optional.ofNullable(patientRequestDto.dateOfBirth()).ifPresent(existingPat::setDateOfBirth);
+            Optional.ofNullable(patientRequestDto.name()).ifPresent(existingPat::setName);
+            Optional.ofNullable(patientRequestDto.email()).ifPresent(existingPat::setEmail);
+            return patientMapper.toResponse(existingPat);
+        }).orElseThrow(()-> new PatientNotExistException("patient already exist"));
+    }
+
+    @Override
+    public void delete(UUID id) {
+         patientRepository.deleteById(id);
+    }
+
 }

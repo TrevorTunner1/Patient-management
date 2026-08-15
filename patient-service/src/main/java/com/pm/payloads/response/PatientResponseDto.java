@@ -1,4 +1,8 @@
 package com.pm.payloads.response;
 
-public record  PatientResponseDto(String id, String name, String email, String address, String dateOfBirth) {
+import java.time.LocalDate;
+import java.util.UUID;
+
+public record  PatientResponseDto(UUID id, String name, String email, String address, String dateOfBirth,
+                                  LocalDate registeredDate) {
 }

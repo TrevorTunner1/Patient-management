@@ -18,8 +18,8 @@ import java.util.UUID;
 @Table(name = "patient")
 public class Patient {
 
-    @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @Id
     private UUID id;
 
     @Column(nullable = false, name = "name")
