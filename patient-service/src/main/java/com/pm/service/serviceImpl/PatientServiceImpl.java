@@ -2,6 +2,8 @@ package com.pm.service.serviceImpl;
 
 import com.pm.exception.EmailAlreadyExistException;
 import com.pm.exception.PatientNotExistException;
+import com.pm.grpc.BillingServiceGrpcClient;
+import com.pm.kafka.KafkaProducer;
 import com.pm.mapper.PatientMapper;
 import com.pm.modal.Patient;
 import com.pm.payloads.response.PatientResponseDto;
@@ -10,6 +12,7 @@ import com.pm.repository.PatientRepository;
 import com.pm.service.PatientService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -20,12 +23,15 @@ import java.util.UUID;
 public class PatientServiceImpl implements PatientService {
     private final PatientRepository patientRepository;
     private final PatientMapper patientMapper;
+    private final BillingServiceGrpcClient billingServiceGrpcClient;
+    private final KafkaProducer kafkaProducer;
 
     public List<PatientResponseDto> getAllPatient () {
         List<Patient> patientList = patientRepository.findAll();
         return patientList.stream().map(patientMapper::toResponse).toList();
     }
 
+    @Transactional
     @Override
     public PatientResponseDto createPatient(PatientRequestDto patientRequestDto) {
 
@@ -34,11 +40,13 @@ public class PatientServiceImpl implements PatientService {
                     + patientRequestDto.email());
         }
 
+        Patient patient =patientRepository.save(patientMapper.toEntity(patientRequestDto));
 
-       Patient patient =  patientMapper.toEntity(patientRequestDto);
+        billingServiceGrpcClient.createBillingAccount(patient.getId().toString(),patient.getName(),patient.getEmail());
 
+        kafkaProducer.sendEvent(patient);
 
-        return patientMapper.toResponse(patientRepository.save(patient));
+        return patientMapper.toResponse(patient);
     }
 
     @Override
